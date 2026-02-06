@@ -66,6 +66,22 @@ export default function TodoPage() {
   const [chatOpen, setChatOpen] = useState(false)
   const [importing, setImporting] = useState(false)
   const { toast } = useToast()
+  const [currentGachaImage, setCurrentGachaImage] = useState<string>("default.webp")
+  const [spentPoints, setSpentPoints] = useState(0)
+  const [rollCost] = useState(25) // Cost in points to roll once
+  const [pointsPerTask] = useState(5) // Points earned per completed task
+
+  // Available gacha images
+  const gachaImages = [
+    "default.webp",
+    "outfit_4.webp",
+    "outfit1.webp",
+    "outfit2.webp",
+    "outfit3.webp",
+    "outfit5.webp",
+    "outfit6.webp",
+    "outfit7.webp"
+  ]
 
   // Load data from Data.json on mount
   useEffect(() => {
@@ -86,6 +102,74 @@ export default function TodoPage() {
       })
       .catch(() => {})
   }, [])
+
+  // Load current gacha image and spent points from localStorage
+  useEffect(() => {
+    const savedImage = localStorage.getItem("currentGachaImage")
+    if (savedImage) {
+      try {
+        setCurrentGachaImage(savedImage)
+      } catch {
+        setCurrentGachaImage("default.webp")
+      }
+    } else {
+      // First launch - show default image
+      setCurrentGachaImage("default.webp")
+    }
+    const savedSpent = localStorage.getItem("spentPoints")
+    if (savedSpent) {
+      try {
+        setSpentPoints(parseFloat(savedSpent) || 0)
+      } catch {
+        setSpentPoints(0)
+      }
+    }
+  }, [])
+
+  // Save current gacha image and spent points to localStorage
+  useEffect(() => {
+    localStorage.setItem("currentGachaImage", currentGachaImage)
+  }, [currentGachaImage])
+
+  useEffect(() => {
+    localStorage.setItem("spentPoints", String(spentPoints))
+  }, [spentPoints])
+
+  // Calculate total points from finished assignments (each task is worth 5 points)
+  const totalEarnedPoints = todoItems
+    .filter((item) => item.status === "finished")
+    .length * pointsPerTask
+
+  // Calculate available points (earned - spent)
+  const availablePoints = totalEarnedPoints - spentPoints
+
+  // Handle gacha roll
+  const handleGachaRoll = useCallback(() => {
+    if (availablePoints < rollCost) return
+
+    // Filter out default outfit and current outfit from possible results
+    const availableImages = gachaImages.filter(
+      (img) => img !== "default.webp" && img !== currentGachaImage
+    )
+    
+    // If no available images (shouldn't happen with 3 images), fallback to all non-default
+    const imagesToChooseFrom = availableImages.length > 0 
+      ? availableImages 
+      : gachaImages.filter((img) => img !== "default.webp")
+    
+    // Use cryptographically secure random number for better randomness
+    const randomArray = new Uint32Array(1)
+    crypto.getRandomValues(randomArray)
+    const randomValue = randomArray[0] / (0xFFFFFFFF + 1) // Convert to 0-1 range
+    const randomIndex = Math.floor(randomValue * imagesToChooseFrom.length)
+    const randomImage = imagesToChooseFrom[randomIndex]
+    
+    // Set as current image (replaces previous)
+    setCurrentGachaImage(randomImage)
+    
+    // Deduct points
+    setSpentPoints((prev) => prev + rollCost)
+  }, [availablePoints, rollCost, gachaImages, currentGachaImage])
 
   const syncToFile = useCallback(async (items: TodoItem[]) => {
     try {
