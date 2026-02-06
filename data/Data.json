@@ -1,3 +1,94 @@
 {
-  "Assignment": []
+  "Assignment": [
+    {
+      "id": "yptwst184l",
+      "assignment_name": "Math HW 1",
+      "course_title": "MATH 280",
+      "type": "Homework",
+      "due_date": "2026-02-07",
+      "points": "5",
+      "status": "finished"
+    },
+    {
+      "id": "qa94uco113",
+      "assignment_name": "Math Quiz 1",
+      "course_title": "MATH 280",
+      "type": "Quiz",
+      "due_date": "2026-02-09",
+      "points": "10",
+      "status": "finished"
+    },
+    {
+      "id": "7ymejcb5mu7",
+      "assignment_name": "Engl HW 1",
+      "course_title": "ENGL 1A",
+      "type": "Homework",
+      "due_date": "2026-02-07",
+      "points": "5",
+      "status": "finished"
+    },
+    {
+      "id": "2wp8y1g7e49",
+      "assignment_name": "Discussion Board 1",
+      "course_title": "ETHS 1",
+      "type": "Homework",
+      "due_date": "2026-02-07",
+      "points": "5",
+      "status": "finished"
+    },
+    {
+      "id": "81eb1bt1bfd",
+      "assignment_name": "Discussion Board 2",
+      "course_title": "ETHS 1",
+      "type": "Homework",
+      "due_date": "2026-02-07",
+      "points": "5",
+      "status": "finished"
+    },
+    {
+      "id": "meollwsknqi",
+      "assignment_name": "spam",
+      "course_title": "sadas",
+      "type": "asd",
+      "due_date": "2026-02-06",
+      "points": null,
+      "status": "finished"
+    },
+    {
+      "id": "znzkr1yxxu",
+      "assignment_name": "spam2",
+      "course_title": "",
+      "type": "",
+      "due_date": "",
+      "points": null,
+      "status": "finished"
+    },
+    {
+      "id": "8ip1dnkoavm",
+      "assignment_name": "spam34",
+      "course_title": "",
+      "type": "",
+      "due_date": "",
+      "points": null,
+      "status": "finished"
+    },
+    {
+      "id": "1hvtitcpr8a",
+      "assignment_name": "sapm132e2",
+      "course_title": "",
+      "type": "",
+      "due_date": "",
+      "points": null,
+      "status": "finished"
+    },
+    {
+      "id": "uciv5eco5rm",
+      "assignment_name": "4rstfagyhud",
+      "course_title": "",
+      "type": "",
+      "due_date": "",
+      "points": null,
+      "status": "finished"
+    }
+  ]
 }

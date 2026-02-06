@@ -19,7 +19,7 @@ const instrumentSerif = Instrument_Serif({
 })
 
 export const metadata: Metadata = {
-  title: "Brillance - Stay On Track When Life Falls Behind",
+  title: "Anchor - Stay On Track When Life Falls Behind",
   description:
     "A calendar and todo list app that helps you catch up, reschedule, and regain control of your time.",
     generator: 'v0.app'
