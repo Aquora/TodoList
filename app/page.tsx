@@ -60,6 +60,33 @@ export default function LandingPage() {
                 </div>
               </div>
 
+              {/* Instructions Section */}
+              <div className="w-full max-w-[600px] lg:w-[600px] mt-8 sm:mt-10 md:mt-12 px-4 sm:px-6">
+                <div className="bg-white rounded-lg border border-[rgba(55,50,47,0.12)] shadow-[0px_2px_4px_rgba(50,45,43,0.06)] p-6 sm:p-8">
+                  <h3 className="text-lg sm:text-xl font-semibold text-[#37322F] mb-4 font-sans">
+                    How to Import from Canvas
+                  </h3>
+                  <ol className="space-y-3 text-sm sm:text-base text-[#605A57] font-sans">
+                    <li className="flex items-start gap-3">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#37322F] text-white flex items-center justify-center text-xs font-semibold">1</span>
+                      <span>Go to Canvas dashboard</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#37322F] text-white flex items-center justify-center text-xs font-semibold">2</span>
+                      <span>Click on list view</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#37322F] text-white flex items-center justify-center text-xs font-semibold">3</span>
+                      <span>Press <kbd className="px-2 py-1 bg-[#F7F5F3] border border-[rgba(55,50,47,0.12)] rounded text-xs font-mono">Ctrl + P</kbd> and save as PDF</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#37322F] text-white flex items-center justify-center text-xs font-semibold">4</span>
+                      <span>Upload PDF to website</span>
+                    </li>
+                  </ol>
+                </div>
+              </div>
+
               
               <div className="self-stretch border-t border-[#E0DEDB] border-b border-[#E0DEDB] flex justify-center items-start">
                 
