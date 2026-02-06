@@ -7,9 +7,10 @@ const genAI = new GoogleGenerativeAI(
   process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY || ""
 )
 
-const DATA_PATH = path.join(process.cwd(), "data", "Data.json")
+const DATA_DIR = path.join(process.cwd(), "data")
+const DATA_PATH = path.join(DATA_DIR, "Data.json")
+const FILD_PDF_PATH = path.join(DATA_DIR, "fild.pdf")
 
-// Schema matches Data.json format: { Assignment: [ { id, assignment_name, course_title, type, due_date, points, status } ] }
 const assignmentSchema = {
   type: SchemaType.OBJECT,
   properties: {
@@ -19,30 +20,12 @@ const assignmentSchema = {
       items: {
         type: SchemaType.OBJECT,
         properties: {
-          assignment_name: {
-            type: SchemaType.STRING,
-            description: "Name or title of the assignment",
-          },
-          course_title: {
-            type: SchemaType.STRING,
-            description: "Course name or title",
-          },
-          type: {
-            type: SchemaType.STRING,
-            description: "Assignment type (e.g. Essay, Quiz, Discussion, Assignment)",
-          },
-          due_date: {
-            type: SchemaType.STRING,
-            description: "Due date in YYYY-MM-DD format if available",
-          },
-          points: {
-            type: SchemaType.STRING,
-            description: "Point value (e.g. 100, 10, or empty if not specified)",
-          },
-          status: {
-            type: SchemaType.STRING,
-            description: "Status: planned, started, or finished",
-          },
+          assignment_name: { type: SchemaType.STRING, description: "Assignment name" },
+          course_title: { type: SchemaType.STRING, description: "Course name" },
+          type: { type: SchemaType.STRING, description: "Assignment type" },
+          due_date: { type: SchemaType.STRING, description: "Due date YYYY-MM-DD" },
+          points: { type: SchemaType.STRING, description: "Point value" },
+          status: { type: SchemaType.STRING, description: "planned, started, or finished" },
         },
         required: ["assignment_name"],
       },
@@ -59,16 +42,21 @@ export async function POST(request: NextRequest) {
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY
   if (!apiKey) {
     return NextResponse.json(
-      { error: "Missing GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY in environment" },
+      { error: "Missing GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY" },
       { status: 500 }
     )
   }
 
   try {
-    const { text } = await request.json()
-    if (!text || typeof text !== "string") {
-      return NextResponse.json({ error: "Missing or invalid text" }, { status: 400 })
+    // Read PDF from data/fild.pdf (saved by save-pdf)
+    let pdfBuffer: Buffer
+    try {
+      pdfBuffer = await fs.readFile(FILD_PDF_PATH)
+    } catch {
+      return NextResponse.json({ error: "PDF file fild.pdf not found. Import a PDF first." }, { status: 400 })
     }
+
+    const pdfBase64 = pdfBuffer.toString("base64")
 
     const model = genAI.getGenerativeModel({
       model: "gemini-2.0-flash",
@@ -79,36 +67,38 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    const prompt = `You are parsing a PDF export of a Canvas LMS (Learning Management System) todo list or assignments page.
-Output must match this exact JSON format: { "Assignment": [ {...}, {...} ] }
+    const prompt = `Parse this Canvas LMS todo list / assignments PDF. Output JSON: { "Assignment": [ {...}, {...} ] }
 
-For each assignment, extract:
-- assignment_name: The assignment or task name (required)
-- course_title: The course name (e.g. "English 101", "Math 205") - empty string if unknown
-- type: The assignment type (Essay, Quiz, Discussion, Assignment, Exam, etc.) - empty string if unknown
-- due_date: Due date in YYYY-MM-DD format - convert "Mar 15, 2025" or "3/15/2025" to YYYY-MM-DD. Empty string if not found.
-- points: The point value as a string (e.g. "100", "10") - empty string if not specified
-- status: Always use "planned" for imported items
+For each assignment extract:
+- assignment_name (required)
+- course_title
+- type (Essay, Quiz, Discussion, etc.)
+- due_date in YYYY-MM-DD format
+- points
+- status: "planned"
 
-Extract ALL assignments from the text. Return a JSON object with an "Assignment" array (capital A). Include every assignment you can find.
+Extract ALL assignments from the PDF. Return { "Assignment": [ ... ] } with capital A.`
 
-Text to parse:
----
-${text}
----`
-
-    const result = await model.generateContent(prompt)
+    const result = await model.generateContent([
+      { text: prompt },
+      {
+        inlineData: {
+          mimeType: "application/pdf",
+          data: pdfBase64,
+        },
+      },
+    ])
     const response = result.response
+    if (!response || !response.candidates?.length) {
+      const errMsg = (response as { promptFeedback?: { blockReason?: string } })?.promptFeedback?.blockReason || "No AI response"
+      return NextResponse.json({ error: errMsg, Assignment: [] }, { status: 500 })
+    }
     const responseText = response.text()
-
-    if (!responseText) {
-      return NextResponse.json(
-        { error: "No response from AI", Assignment: [] },
-        { status: 200 }
-      )
+    if (!responseText?.trim()) {
+      return NextResponse.json({ error: "Empty AI response", Assignment: [] }, { status: 500 })
     }
 
-    const parsed = JSON.parse(responseText) as { Assignment?: Array<{
+    let parsed: { Assignment?: Array<{
       assignment_name?: string
       course_title?: string
       type?: string
@@ -116,6 +106,11 @@ ${text}
       points?: string
       status?: string
     }> }
+    try {
+      parsed = JSON.parse(responseText) as typeof parsed
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON from AI", Assignment: [] }, { status: 500 })
+    }
 
     const newAssignments = Array.isArray(parsed.Assignment)
       ? parsed.Assignment.map((a) => ({
@@ -129,7 +124,6 @@ ${text}
         }))
       : []
 
-    // Read current Data.json and append
     let data: { Assignment: Array<{ id?: string; assignment_name: string; course_title: string; type: string; due_date: string; points: string | null; status?: string }> }
     try {
       const content = await fs.readFile(DATA_PATH, "utf-8")
@@ -140,14 +134,12 @@ ${text}
     }
 
     data.Assignment.push(...newAssignments)
+    await fs.mkdir(path.dirname(DATA_PATH), { recursive: true })
     await fs.writeFile(DATA_PATH, JSON.stringify(data, null, 2), "utf-8")
 
     return NextResponse.json({ Assignment: data.Assignment })
   } catch (err) {
     console.error("Parse PDF error:", err)
-    return NextResponse.json(
-      { error: "Failed to parse PDF", Assignment: [] },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Failed to parse PDF", Assignment: [] }, { status: 500 })
   }
 }

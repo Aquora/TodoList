@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Inter, Instrument_Serif } from "next/font/google"
+import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 
 const inter = Inter({
@@ -19,7 +20,7 @@ const instrumentSerif = Instrument_Serif({
 })
 
 export const metadata: Metadata = {
-  title: "Anchor - Stay On Track When Life Falls Behind",
+  title: "Brillance - Stay On Track When Life Falls Behind",
   description:
     "A calendar and todo list app that helps you catch up, reschedule, and regain control of your time.",
     generator: 'v0.app'
@@ -41,7 +42,7 @@ export default function RootLayout({
         />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:wght@400&display=swap" />
       </head>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">{children}<Toaster /></body>
     </html>
   )
 }

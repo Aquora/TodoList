@@ -11,9 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { FileUp, Copy, Plus, X, MessageCircle, Loader2, Sparkles } from "lucide-react"
+import { FileUp, Copy, Plus, X, MessageCircle, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
-import Image from "next/image"
 
 type TodoStatus = "planned" | "started" | "finished"
 
@@ -65,13 +65,7 @@ export default function TodoPage() {
   const [copySuccess, setCopySuccess] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
   const [importing, setImporting] = useState(false)
-  const [currentGachaImage, setCurrentGachaImage] = useState<string>("default.webp")
-  const [spentPoints, setSpentPoints] = useState(0)
-  const [rollCost] = useState(25) // Cost in points to roll once
-  const [pointsPerTask] = useState(5) // Points earned per completed task
-
-  // Available gacha images
-  const gachaImages = ["default.webp", "outfit_4.webp", "outfit1.webp"]
+  const { toast } = useToast()
 
   // Load data from Data.json on mount
   useEffect(() => {
@@ -92,70 +86,6 @@ export default function TodoPage() {
       })
       .catch(() => {})
   }, [])
-
-  // Load current gacha image and spent points from localStorage
-  useEffect(() => {
-    const savedImage = localStorage.getItem("currentGachaImage")
-    if (savedImage) {
-      try {
-        setCurrentGachaImage(savedImage)
-      } catch {
-        setCurrentGachaImage("default.webp")
-      }
-    } else {
-      // First launch - show default image
-      setCurrentGachaImage("default.webp")
-    }
-    const savedSpent = localStorage.getItem("spentPoints")
-    if (savedSpent) {
-      try {
-        setSpentPoints(parseFloat(savedSpent) || 0)
-      } catch {
-        setSpentPoints(0)
-      }
-    }
-  }, [])
-
-  // Save current gacha image and spent points to localStorage
-  useEffect(() => {
-    localStorage.setItem("currentGachaImage", currentGachaImage)
-  }, [currentGachaImage])
-
-  useEffect(() => {
-    localStorage.setItem("spentPoints", String(spentPoints))
-  }, [spentPoints])
-
-  // Calculate total points from finished assignments (each task is worth 5 points)
-  const totalEarnedPoints = todoItems
-    .filter((item) => item.status === "finished")
-    .length * pointsPerTask
-
-  // Calculate available points (earned - spent)
-  const availablePoints = totalEarnedPoints - spentPoints
-
-  // Handle gacha roll
-  const handleGachaRoll = useCallback(() => {
-    if (availablePoints < rollCost) return
-
-    // Filter out default outfit and current outfit from possible results
-    const availableImages = gachaImages.filter(
-      (img) => img !== "default.webp" && img !== currentGachaImage
-    )
-    
-    // If no available images (shouldn't happen with 3 images), fallback to all non-default
-    const imagesToChooseFrom = availableImages.length > 0 
-      ? availableImages 
-      : gachaImages.filter((img) => img !== "default.webp")
-    
-    // Randomly select an image from available options
-    const randomImage = imagesToChooseFrom[Math.floor(Math.random() * imagesToChooseFrom.length)]
-    
-    // Set as current image (replaces previous)
-    setCurrentGachaImage(randomImage)
-    
-    // Deduct points
-    setSpentPoints((prev) => prev + rollCost)
-  }, [availablePoints, rollCost, gachaImages, currentGachaImage])
 
   const syncToFile = useCallback(async (items: TodoItem[]) => {
     try {
@@ -202,26 +132,28 @@ export default function TodoPage() {
       if (file.type !== "application/pdf") return
 
       setImporting(true)
-      // Yield to let React paint the loading overlay before heavy work
       await new Promise((r) => setTimeout(r, 0))
 
-      let text = ""
+      // 1. Save PDF as fild.pdf in data folder
       try {
-        text = await extractTextFromPDF(file)
+        const formData = new FormData()
+        formData.append("file", file)
+        const saveRes = await fetch("/api/save-pdf", { method: "POST", body: formData })
+        if (!saveRes.ok) throw new Error("Failed to save PDF")
       } catch {
         setImporting(false)
         e.target.value = ""
+        toast({ title: "Import failed", description: "Could not save PDF", variant: "destructive" })
         return
       }
 
+      // 2. GenAI reads fild.pdf and parses assignments
       try {
-        const res = await fetch("/api/parse-pdf", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
-        })
+        const res = await fetch("/api/parse-pdf", { method: "POST" })
         const data = await res.json()
+        if (!res.ok) throw new Error(data.error || "Parse failed")
         const assignments = data.Assignment || []
+        if (assignments.length === 0 && data.error) throw new Error(data.error)
 
         const items: TodoItem[] = assignments.map(
           (a: { id?: string; assignment_name?: string; course_title?: string; type?: string; due_date?: string; points?: string | null; status?: string }) => ({
@@ -234,11 +166,19 @@ export default function TodoPage() {
             status: (a.status as TodoStatus) || "planned",
           })
         )
-
         setTodoItems(items)
+        toast({ title: "Import complete", description: `${items.length} assignments imported with AI` })
       } catch {
-        // Fallback: use raw line splitting if AI parse fails
-        const lines = text
+        // Fallback: client extract + raw line splitting if GenAI fails
+        let fallbackText = ""
+        try {
+          fallbackText = await extractTextFromPDF(file)
+        } catch {
+          setImporting(false)
+          e.target.value = ""
+          return
+        }
+        const lines = fallbackText
           .split(/\r?\n/)
           .map((s) => s.trim())
           .filter(Boolean)
@@ -256,12 +196,13 @@ export default function TodoPage() {
           syncToFile(next)
           return next
         })
+        toast({ title: "Import complete", description: `GenAI unavailable. ${items.length} items imported with basic parsing.` })
       } finally {
         setImporting(false)
       }
       e.target.value = ""
     },
-    [syncToFile]
+    [syncToFile, toast]
   )
 
   const handleAddItem = useCallback(() => {
@@ -352,7 +293,7 @@ export default function TodoPage() {
               href="/"
               className="text-[#2F3037] text-sm sm:text-base md:text-lg font-medium leading-5 font-sans"
             >
-              Anchor
+              Brillance
             </Link>
           </div>
 
@@ -443,7 +384,12 @@ export default function TodoPage() {
             </div>
 
             {/* Todo items */}
-            {todoItems.length === 0 ? (
+            {importing ? (
+              <div className="flex flex-col items-center justify-center flex-1 min-h-[150px] text-[#605A57] text-sm gap-3">
+                <Loader2 className="size-8 animate-spin" />
+                <p>Saving PDF… AI is parsing assignments</p>
+              </div>
+            ) : todoItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center flex-1 min-h-[150px] text-[#605A57] text-sm">
                 
               </div>
@@ -463,59 +409,8 @@ export default function TodoPage() {
         </div>
       </div>
 
-      {/* Right 1/4 - Gacha System */}
-      <div className="w-1/4 min-h-screen border-l border-[rgba(55,50,47,0.12)] bg-white flex flex-col">
-        <div className="flex flex-col h-full p-6">
-          {/* Gacha Header */}
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold text-[#37322F] mb-2 flex items-center gap-2">
-              <Sparkles className="size-5" />
-              Gacha System
-            </h2>
-            <p className="text-sm text-[#605A57] mb-4">
-              Spend points to collect outfits!
-            </p>
-            
-            {/* Points Display */}
-            <div className="bg-[#F7F5F3] rounded-lg p-4 mb-4 border border-[rgba(55,50,47,0.08)]">
-              <div className="text-xs text-[#605A57] mb-1">Available Points</div>
-              <div className="text-2xl font-bold text-[#37322F]">{Math.floor(availablePoints)}</div>
-              <div className="text-xs text-[#605A57] mt-1">
-                Earned: {Math.floor(totalEarnedPoints)} | Spent: {Math.floor(spentPoints)}
-              </div>
-            </div>
-
-            {/* Roll Button */}
-            <Button
-              onClick={handleGachaRoll}
-              disabled={availablePoints < rollCost}
-              className="w-full h-12 rounded-lg bg-[#37322F] text-white hover:bg-[#37322F]/90 disabled:opacity-50 disabled:cursor-not-allowed mb-2"
-            >
-              <Sparkles className="size-4 mr-2" />
-              Roll ({rollCost} points)
-            </Button>
-            {availablePoints < rollCost && (
-              <p className="text-xs text-[#605A57] text-center">
-                Need {rollCost - Math.floor(availablePoints)} more points
-              </p>
-            )}
-          </div>
-
-          {/* Current Image Display */}
-          <div className="flex-1 flex flex-col items-center justify-center">
-            <h3 className="text-sm font-medium text-[#37322F] mb-4">Current Outfit</h3>
-            <div className="relative w-full max-w-[200px] aspect-square rounded-lg overflow-hidden border border-[rgba(55,50,47,0.12)] bg-[#F7F5F3] shadow-sm">
-              <Image
-                src={`/images/${currentGachaImage}`}
-                alt="Current gacha outfit"
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 200px, 200px"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Right 1/4 - empty */}
+      <div className="w-1/4 min-h-screen border-l border-[rgba(55,50,47,0.12)]" />
 
       {/* AI Chat button - fixed at bottom */}
       <div className="fixed bottom-6 right-6 z-50">
