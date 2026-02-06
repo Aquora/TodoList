@@ -71,7 +71,16 @@ export default function TodoPage() {
   const [pointsPerTask] = useState(5) // Points earned per completed task
 
   // Available gacha images
-  const gachaImages = ["default.webp", "outfit_4.webp", "outfit1.webp"]
+  const gachaImages = [
+    "default.webp",
+    "outfit_4.webp",
+    "outfit1.webp",
+    "outfit2.webp",
+    "outfit3.webp",
+    "outfit5.webp",
+    "outfit6.webp",
+    "outfit7.webp"
+  ]
 
   // Load data from Data.json on mount
   useEffect(() => {
@@ -147,8 +156,12 @@ export default function TodoPage() {
       ? availableImages 
       : gachaImages.filter((img) => img !== "default.webp")
     
-    // Randomly select an image from available options
-    const randomImage = imagesToChooseFrom[Math.floor(Math.random() * imagesToChooseFrom.length)]
+    // Use cryptographically secure random number for better randomness
+    const randomArray = new Uint32Array(1)
+    crypto.getRandomValues(randomArray)
+    const randomValue = randomArray[0] / (0xFFFFFFFF + 1) // Convert to 0-1 range
+    const randomIndex = Math.floor(randomValue * imagesToChooseFrom.length)
+    const randomImage = imagesToChooseFrom[randomIndex]
     
     // Set as current image (replaces previous)
     setCurrentGachaImage(randomImage)
